@@ -53,6 +53,12 @@ async function run() {
       const result=await foods.insertOne(newFood)
       res.send(result)
     })
+    app.delete('/myfoods/:id',async(req,res) => {
+      const query={_id:new ObjectId(req.params.id)}
+      const result=await foods.deleteOne(query)
+      console.log(result);
+      res.send(result)
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(

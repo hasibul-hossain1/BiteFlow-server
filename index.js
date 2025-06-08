@@ -34,6 +34,13 @@ async function run() {
       const result=await purchase.insertOne(req.body)
       res.send(result)
     })
+    app.get('/myfoods',async (req,res) => {
+      const email=req.query.email
+      const query={"addedBy.email":email}
+      const result=await foods.find(query).toArray()
+      console.log(result);
+      res.send(result)
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(

@@ -38,7 +38,19 @@ async function run() {
       const email=req.query.email
       const query={"addedBy.email":email}
       const result=await foods.find(query).toArray()
-      console.log(result);
+      res.send(result)
+    })
+
+    app.get('/myorders',async (req,res) => {
+      const email=req.query.email
+      const query={buyerEmail:email}
+      const result=await purchase.find(query).toArray()
+      res.send(result)
+    })
+
+    app.post('/newfood',async (req,res) => {
+      const newFood=req.body
+      const result=await foods.insertOne(newFood)
       res.send(result)
     })
 

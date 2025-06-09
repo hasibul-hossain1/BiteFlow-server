@@ -65,6 +65,12 @@ async function run() {
       console.log(result);
       res.send(result)
     })
+    app.put('/updatefood/:id',async (req,res) => {
+      const query={_id: new ObjectId(req.params.id)}
+      const updateDoc={$set: req.body}
+      const result=await foods.updateOne(query,updateDoc)
+      res.send(result)
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(

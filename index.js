@@ -4,7 +4,8 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 const admin = require("firebase-admin");
-var serviceAccount = require("./serviceAccountKey.json");
+const serviceAccount = require("./serviceAccountKey.json");
+require('dotenv').config()
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -65,7 +66,7 @@ const verifySession = (req, res, next) => {
   }
 };
 
-const uri = "mongodb://localhost:27017/";
+const uri = `mongodb+srv://${process.env.USER}:${process.env.PASS}@cluster0.f1kjav4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -85,7 +86,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/purchase", async (req, res) => {
+    app.post("/purchase",verifySession, async (req, res) => {
       //add item to purchase collection
       const selectedItem = req.body;
       const purchaseResult = await purchase.insertOne(selectedItem);
@@ -114,25 +115,25 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/newfood", async (req, res) => {
+    app.post("/newfood",verifySession, async (req, res) => {
       const newFood = req.body;
       const result = await foods.insertOne(newFood);
       res.send(result);
     });
 
-    app.delete("/myfoods/:id", async (req, res) => {
+    app.delete("/myfoods/:id",verifySession, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await foods.deleteOne(query);
       res.send(result);
     });
 
-    app.delete("/myorders/:id", async (req, res) => {
+    app.delete("/myorders/:id",verifySession, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await purchase.deleteOne(query);
       res.send(result);
     });
     
-    app.put("/updatefood/:id", async (req, res) => {
+    app.put("/updatefood/:id",verifySession, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const updateDoc = { $set: req.body };
       const result = await foods.updateOne(query, updateDoc);

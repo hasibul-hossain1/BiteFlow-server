@@ -2,16 +2,70 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const uri = "mongodb://localhost:27017/"
+const cookieParser = require("cookie-parser");
+const admin = require("firebase-admin");
+var serviceAccount = require("./serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+app.use(cookieParser());
 const port = process.env.PORT || 3030;
 
 app.get("/", (req, res) => {
   res.send("Hello World");
 });
+
+app.post("/login", async (req, res) => {
+  const { idToken } = req.body;
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const sessionUser = {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+    };
+    res.cookie("session", JSON.stringify(sessionUser), {
+      httpOnly: true,
+      secure: false,
+    });
+
+    res.json({ message: "Logged in successfully" });
+  } catch (error) {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+});
+
+app.post("/logout", (req, res) => {
+  res.clearCookie("session", {
+    httpOnly: true,
+    secure: false, // true in production
+  });
+  res.json({ message: "Logged out successfully" });
+});
+
+const verifySession = (req, res, next) => {
+  const sessionCookie = req.cookies.session;
+  if (!sessionCookie) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const user = JSON.parse(sessionCookie);
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid session" });
+  }
+};
+
+const uri = "mongodb://localhost:27017/";
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -24,53 +78,66 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const foods = client.db("foods_db").collection("foods");
-    const purchase=client.db('foods_db').collection('purchase')
+    const purchase = client.db("foods_db").collection("purchase");
 
-    app.get('/foods', async (req,res) => {
-        const result=await foods.find().toArray()
-        res.send(result)
-    })
-    app.post('/purchase',async (req,res) => {
-      const result=await purchase.insertOne(req.body)
-      res.send(result)
-    })
-    app.get('/myfoods',async (req,res) => {
-      const email=req.query.email
-      const query={"addedBy.email":email}
-      const result=await foods.find(query).toArray()
-      res.send(result)
-    })
+    app.get("/foods", async (req, res) => {
+      const result = await foods.find().toArray();
+      res.send(result);
+    });
 
-    app.get('/myorders',async (req,res) => {
-      const email=req.query.email
-      const query={buyerEmail:email}
-      const result=await purchase.find(query).toArray()
-      res.send(result)
-    })
+    app.post("/purchase", async (req, res) => {
+      //add item to purchase collection
+      const selectedItem = req.body;
+      const purchaseResult = await purchase.insertOne(selectedItem);
+      //update purchase count in foods collection
+      const purchaseCount = selectedItem.quantity;
+      const query = { _id: new ObjectId(selectedItem.foodId) };
+      const updatedDoc = { $inc: { purchaseCount, quantity: -purchaseCount } };
+      const updateResult = await foods.updateOne(query, updatedDoc);
+      res.send({ purchaseResult, updateResult });
+    });
+    app.get("/myfoods", verifySession, async (req, res) => {
+      const email = req.query.email;
+      if (req.user.email !== email)
+        return res.status(401).json({ message: "Unauthorized" });
+      const query = { "addedBy.email": email };
+      const result = await foods.find(query).toArray();
+      res.send(result);
+    });
 
-    app.post('/newfood',async (req,res) => {
-      const newFood=req.body
-      const result=await foods.insertOne(newFood)
-      res.send(result)
-    })
-    app.delete('/myfoods/:id',async(req,res) => {
-      const query={_id:new ObjectId(req.params.id)}
-      const result=await foods.deleteOne(query)
-      console.log(result);
-      res.send(result)
-    })
-    app.delete('/myorders/:id',async(req,res) => {
-      const query={_id:new ObjectId(req.params.id)}
-      const result=await purchase.deleteOne(query)
-      console.log(result);
-      res.send(result)
-    })
-    app.put('/updatefood/:id',async (req,res) => {
-      const query={_id: new ObjectId(req.params.id)}
-      const updateDoc={$set: req.body}
-      const result=await foods.updateOne(query,updateDoc)
-      res.send(result)
-    })
+    app.get("/myorders", verifySession, async (req, res) => {
+      const email = req.query.email;
+      if (req.user.email !== email)
+        return res.status(401).json({ message: "Unauthorized" });
+      const query = { buyerEmail: email };
+      const result = await purchase.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/newfood", async (req, res) => {
+      const newFood = req.body;
+      const result = await foods.insertOne(newFood);
+      res.send(result);
+    });
+
+    app.delete("/myfoods/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const result = await foods.deleteOne(query);
+      res.send(result);
+    });
+
+    app.delete("/myorders/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const result = await purchase.deleteOne(query);
+      res.send(result);
+    });
+    
+    app.put("/updatefood/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const updateDoc = { $set: req.body };
+      const result = await foods.updateOne(query, updateDoc);
+      res.send(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -81,6 +148,6 @@ async function run() {
 }
 run().catch(console.dir);
 
-app.listen(port,() => {
-  console.log('http://localhost:'+port);
-})
+app.listen(port, () => {
+  console.log("http://localhost:" + port);
+});

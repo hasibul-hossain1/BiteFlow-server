@@ -4,7 +4,11 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 const admin = require("firebase-admin");
-const serviceAccount = require("./serviceAccountKey.json");
+
+const decoded=Buffer.from(process.env.SERVICE_ACCOUNT_KEY,'base64').toString('utf8')
+
+
+const serviceAccount = JSON.parse(decoded)
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

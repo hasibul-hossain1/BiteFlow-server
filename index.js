@@ -5,7 +5,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 const admin = require("firebase-admin");
 const serviceAccount = require("./serviceAccountKey.json");
-require('dotenv').config()
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -36,7 +35,8 @@ app.post("/login", async (req, res) => {
     };
     res.cookie("session", JSON.stringify(sessionUser), {
       httpOnly: true,
-      secure: false,
+      secure: true,
+      sameSite:'none'
     });
 
     res.json({ message: "Logged in successfully" });
@@ -48,7 +48,9 @@ app.post("/login", async (req, res) => {
 app.post("/logout", (req, res) => {
   res.clearCookie("session", {
     httpOnly: true,
-    secure: false, // true in production
+    path:"/",
+    secure: true,
+    sameSite:"none"
   });
   res.json({ message: "Logged out successfully" });
 });
@@ -66,7 +68,7 @@ const verifySession = (req, res, next) => {
   }
 };
 
-const uri = `mongodb+srv://${process.env.USER}:${process.env.PASS}@cluster0.f1kjav4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.PASS}@cluster0.f1kjav4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -128,9 +130,20 @@ async function run() {
     });
 
     app.delete("/myorders/:id",verifySession, async (req, res) => {
+      //deleteItem
       const query = { _id: new ObjectId(req.params.id) };
-      const result = await purchase.deleteOne(query);
-      res.send(result);
+      const deleteResult = await purchase.deleteOne(query);
+      //update quantity
+      const foodId=req.query.foodId
+      const quantity=+req.query.quantity
+      const foodQuery={_id:new ObjectId(foodId)}
+      const updateDoc={
+        $inc:{
+          purchaseCount:-quantity, quantity 
+        }
+      }
+      const updateFoodResult=foods.updateOne(foodQuery,updateDoc)
+      res.send(deleteResult,updateFoodResult);
     });
     
     app.put("/updatefood/:id",verifySession, async (req, res) => {

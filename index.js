@@ -6,9 +6,9 @@ const cookieParser = require("cookie-parser");
 const admin = require("firebase-admin");
 
 const decoded=Buffer.from(process.env.SERVICE_ACCOUNT_KEY,'base64').toString('utf8')
-
-
 const serviceAccount = JSON.parse(decoded)
+
+
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -16,12 +16,14 @@ admin.initializeApp({
 
 const app = express();
 app.use(express.json());
+
 app.use(
   cors({
     origin: ["http://localhost:5173","https://flow-bite.netlify.app"],
     credentials: true,
   })
 );
+
 app.use(cookieParser());
 const port = process.env.PORT || 3030;
 

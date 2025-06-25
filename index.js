@@ -5,10 +5,10 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 const admin = require("firebase-admin");
 
-const decoded=Buffer.from(process.env.SERVICE_ACCOUNT_KEY,'base64').toString('utf8')
-const serviceAccount = JSON.parse(decoded)
-
-
+const decoded = Buffer.from(process.env.SERVICE_ACCOUNT_KEY, "base64").toString(
+  "utf8"
+);
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -19,7 +19,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["http://localhost:5173","https://flow-bite.netlify.app"],
+    origin: ["http://localhost:5173", "https://flow-bite.netlify.app"],
     credentials: true,
   })
 );
@@ -42,7 +42,7 @@ app.post("/login", async (req, res) => {
     res.cookie("session", JSON.stringify(sessionUser), {
       httpOnly: true,
       secure: true,
-      sameSite:'none'
+      sameSite: "none",
     });
 
     res.json({ message: "Logged in successfully" });
@@ -54,9 +54,9 @@ app.post("/login", async (req, res) => {
 app.post("/logout", (req, res) => {
   res.clearCookie("session", {
     httpOnly: true,
-    path:"/",
+    path: "/",
     secure: true,
-    sameSite:"none"
+    sameSite: "none",
   });
   res.json({ message: "Logged out successfully" });
 });
@@ -89,12 +89,23 @@ async function run() {
     const foods = client.db("foods_db").collection("foods");
     const purchase = client.db("foods_db").collection("purchase");
 
-    app.get("/foods", async (req, res) => {
-      const result = await foods.find().toArray();
+    app.get("/searchFoods", async (req, res) => {
+      const { search } = req.query || "";
+      const result = await foods
+        .find({
+          foodName: { $regex: search, $options: "i" },
+        })
+        .toArray();
+      console.log(result);
       res.send(result);
     });
 
-    app.post("/purchase",verifySession, async (req, res) => {
+    app.get("/foods", async (req, res) => {
+      const count = await foods.find().toArray();
+      res.send({ count });
+    });
+
+    app.post("/purchase", verifySession, async (req, res) => {
       //add item to purchase collection
       const selectedItem = req.body;
       const purchaseResult = await purchase.insertOne(selectedItem);
@@ -123,36 +134,37 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/newfood",verifySession, async (req, res) => {
+    app.post("/newfood", verifySession, async (req, res) => {
       const newFood = req.body;
       const result = await foods.insertOne(newFood);
       res.send(result);
     });
 
-    app.delete("/myfoods/:id",verifySession, async (req, res) => {
+    app.delete("/myfoods/:id", verifySession, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await foods.deleteOne(query);
       res.send(result);
     });
 
-    app.delete("/myorders/:id",verifySession, async (req, res) => {
+    app.delete("/myorders/:id", verifySession, async (req, res) => {
       //deleteItem
       const query = { _id: new ObjectId(req.params.id) };
       const deleteResult = await purchase.deleteOne(query);
       //update quantity
-      const foodId=req.query.foodId
-      const quantity=+req.query.quantity
-      const foodQuery={_id:new ObjectId(foodId)}
-      const updateDoc={
-        $inc:{
-          purchaseCount:-quantity, quantity 
-        }
-      }
-      const updateFoodResult=foods.updateOne(foodQuery,updateDoc)
-      res.send(deleteResult,updateFoodResult);
+      const foodId = req.query.foodId;
+      const quantity = +req.query.quantity;
+      const foodQuery = { _id: new ObjectId(foodId) };
+      const updateDoc = {
+        $inc: {
+          purchaseCount: -quantity,
+          quantity,
+        },
+      };
+      const updateFoodResult = foods.updateOne(foodQuery, updateDoc);
+      res.send(deleteResult, updateFoodResult);
     });
-    
-    app.put("/updatefood/:id",verifySession, async (req, res) => {
+
+    app.put("/updatefood/:id", verifySession, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const updateDoc = { $set: req.body };
       const result = await foods.updateOne(query, updateDoc);

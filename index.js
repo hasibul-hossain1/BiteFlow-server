@@ -41,8 +41,8 @@ app.post("/login", async (req, res) => {
     };
     res.cookie("session", JSON.stringify(sessionUser), {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
+      secure: process.env.NODE_ENV==='production',
+      sameSite: process.env.NODE_ENV==='production'?"none":"lax"
     });
 
     res.json({ message: "Logged in successfully" });
@@ -55,8 +55,8 @@ app.post("/logout", (req, res) => {
   res.clearCookie("session", {
     httpOnly: true,
     path: "/",
-    secure: true,
-    sameSite: "none",
+    secure: process.env.NODE_ENV==='production',
+    sameSite: process.env.NODE_ENV==='production'?"none":"lax",
   });
   res.json({ message: "Logged out successfully" });
 });
@@ -89,20 +89,10 @@ async function run() {
     const foods = client.db("foods_db").collection("foods");
     const purchase = client.db("foods_db").collection("purchase");
 
-    app.get("/searchFoods", async (req, res) => {
-      const { search } = req.query || "";
-      const result = await foods
-        .find({
-          foodName: { $regex: search, $options: "i" },
-        })
-        .toArray();
-      console.log(result);
-      res.send(result);
-    });
 
     app.get("/foods", async (req, res) => {
-      const count = await foods.find().toArray();
-      res.send({ count });
+      const result = await foods.find().toArray()
+      res.send( result );
     });
 
     app.post("/purchase", verifySession, async (req, res) => {
@@ -116,6 +106,7 @@ async function run() {
       const updateResult = await foods.updateOne(query, updatedDoc);
       res.send({ purchaseResult, updateResult });
     });
+    
     app.get("/myfoods", verifySession, async (req, res) => {
       const email = req.query.email;
       if (req.user.email !== email)
